@@ -1,0 +1,10 @@
+This example program uses GLFW 3 to manage the context and is based on the
+OpenGL 3.2 core profile, since this is the latest OpenGL version supported
+by OS X.
+
+It demonstrates how to
+- set up a context
+- load vertex and fragment shaders
+- create a VAO and VBO
+- init and load PMV matrices
+- draw a quad
