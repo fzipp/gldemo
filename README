@@ -1,6 +1,5 @@
 This example program uses GLFW 3 to manage the context and is based on the
-OpenGL 3.2 core profile, since this is the latest OpenGL version supported
-by OS X.
+OpenGL 3.2 core profile.
 
 It demonstrates how to
 - set up a context
