@@ -3,11 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
+	"runtime"
+
 	"github.com/fzipp/geom"
 	"github.com/go-gl/gl"
 	glfw "github.com/go-gl/glfw3"
-	"os"
-	"runtime"
 )
 
 const (
