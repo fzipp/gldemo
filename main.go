@@ -112,7 +112,7 @@ func main() {
 	var pmatrix, mvmatrix geom.Mat4
 	pmatrix.Ortho(0, resW, resH, 0, -1.0, 1.0)
 	LoadMatrix(&pmatrix, prog, "pmatrix")
-	mvmatrix.Id()
+	mvmatrix.ID()
 	LoadMatrix(&mvmatrix, prog, "mvmatrix")
 
 	attr := prog.GetAttribLocation("vertex")
