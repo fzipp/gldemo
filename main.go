@@ -1,14 +1,14 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"runtime"
+	"unsafe"
 
 	"github.com/fzipp/geom"
-	"github.com/go-gl/gl"
-	glfw "github.com/go-gl/glfw3"
+	"github.com/go-gl/gl/v4.1-core/gl"
+	"github.com/go-gl/glfw/v3.2/glfw"
 )
 
 const (
@@ -16,17 +16,20 @@ const (
 	resH = 600
 )
 
-func InitGraphics() (*glfw.Window, error) {
-	glfw.SetErrorCallback(onError)
+func init() {
+	// GLFW event handling must run on the main OS thread
+	runtime.LockOSThread()
+}
 
-	if !glfw.Init() {
-		return nil, errors.New("Can't init GLFW.")
+func InitGraphics() (*glfw.Window, error) {
+	if err := glfw.Init(); err != nil {
+		return nil, err
 	}
 
 	glfw.WindowHint(glfw.ContextVersionMajor, 3)
 	glfw.WindowHint(glfw.ContextVersionMinor, 2)
-	glfw.WindowHint(glfw.OpenglForwardCompatible, glfw.True)
-	glfw.WindowHint(glfw.OpenglProfile, glfw.OpenglCoreProfile)
+	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
+	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 
 	win, err := glfw.CreateWindow(resW, resH, "OpenGL Demo", nil, nil)
 	if err != nil {
@@ -35,21 +38,19 @@ func InitGraphics() (*glfw.Window, error) {
 
 	win.MakeContextCurrent()
 
-	// Initialize GLEW
-	if gl.Init() != 0 {
-		return nil, errors.New("Can't init GLEW.")
+	// Initialize Glow
+	if err := gl.Init(); err != nil {
+		return nil, err
 	}
 
 	return win, nil
 }
 
-func onError(err glfw.ErrorCode, desc string) {
-	report(fmt.Errorf("%v: %s", err, desc))
-}
-
-func report(err error) {
-	fmt.Fprintln(os.Stderr, err)
-	os.Exit(1)
+func ck(err error) {
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
 
 const (
@@ -82,31 +83,28 @@ func main() {
 	win, err := InitGraphics()
 	defer glfw.Terminate()
 
-	if err != nil {
-		report(err)
-	}
+	ck(err)
 
 	vs, fs, err := LoadShaders("shaders/vertex.glsl", "shaders/fragment.glsl")
-	if err != nil {
-		report(err)
-	}
+	ck(err)
 
 	gl.ClearColor(0.0, 0.0, 0.4, 0.0)
 
 	var vertices quadArray
 	quadCoords(Rect{geom.V2(100, 100), geom.Size{W: 600, H: 400}}, &vertices)
 
-	vao := gl.GenVertexArray()
-	vao.Bind()
-	vbo := gl.GenBuffer()
-	vbo.Bind(gl.ARRAY_BUFFER)
-	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, &vertices, gl.STATIC_DRAW)
+	var vao uint32
+	gl.GenVertexArrays(1, &vao)
+	gl.BindVertexArray(vao)
+
+	var vbo uint32
+	gl.GenBuffers(1, &vbo)
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, unsafe.Pointer(&vertices), gl.STATIC_DRAW)
 
 	prog, err := LoadProgram(vs, fs)
-	if err != nil {
-		report(err)
-	}
-	prog.Use()
+	ck(err)
+	gl.UseProgram(prog)
 
 	// Init and load PMV matrices
 	var pmatrix, mvmatrix geom.Mat4
@@ -115,16 +113,16 @@ func main() {
 	mvmatrix.ID()
 	LoadMatrix(&mvmatrix, prog, "mvmatrix")
 
-	attr := prog.GetAttribLocation("vertex")
+	attr := uint32(gl.GetAttribLocation(prog, gl.Str("vertex\x00")))
 
 	for !win.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 
-		attr.EnableArray()
-		vbo.Bind(gl.ARRAY_BUFFER)
-		attr.AttribPointer(dimensions, gl.FLOAT, false, 0, nil)
+		gl.EnableVertexAttribArray(attr)
+		gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+		gl.VertexAttribPointer(attr, dimensions, gl.FLOAT, false, 0, nil)
 		gl.DrawArrays(gl.TRIANGLE_STRIP, 0, quadVertexCount)
-		attr.DisableArray()
+		gl.DisableVertexAttribArray(attr)
 
 		win.SwapBuffers()
 		glfw.PollEvents()
