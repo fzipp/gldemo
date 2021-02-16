@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"strings"
 	"unsafe"
 
@@ -10,14 +9,21 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 )
 
-func LoadShader(filename string, shaderType uint32) (shader uint32, err error) {
-	code, err := ioutil.ReadFile(filename)
+func loadShaders(vertexShaderCode, fragmentShaderCode string) (vs uint32, fs uint32, err error) {
+	vs, err = loadShader(vertexShaderCode, gl.VERTEX_SHADER)
 	if err != nil {
-		return 0, err
+		return vs, 0, fmt.Errorf("could not load vertex shader: %s", err)
 	}
-	code = append(code, 0)
+	fs, err = loadShader(fragmentShaderCode, gl.FRAGMENT_SHADER)
+	if err != nil {
+		return vs, fs, fmt.Errorf("could not load fragment shader: %s", err)
+	}
+	return vs, fs, nil
+}
+
+func loadShader(shaderCode string, shaderType uint32) (shader uint32, err error) {
 	shader = gl.CreateShader(shaderType)
-	csources, free := gl.Strs(string(code))
+	csources, free := gl.Strs(shaderCode + "\x00")
 	gl.ShaderSource(shader, 1, csources, nil)
 	free()
 	gl.CompileShader(shader)
@@ -29,19 +35,7 @@ func LoadShader(filename string, shaderType uint32) (shader uint32, err error) {
 	return shader, nil
 }
 
-func LoadShaders(vertFile, fragFile string) (vs uint32, fs uint32, err error) {
-	vs, err = LoadShader(vertFile, gl.VERTEX_SHADER)
-	if err != nil {
-		return vs, 0, err
-	}
-	fs, err = LoadShader(fragFile, gl.FRAGMENT_SHADER)
-	if err != nil {
-		return vs, fs, err
-	}
-	return vs, fs, nil
-}
-
-func LoadProgram(shaders ...uint32) (program uint32, err error) {
+func loadProgram(shaders ...uint32) (program uint32, err error) {
 	p := gl.CreateProgram()
 	for _, shader := range shaders {
 		gl.AttachShader(p, shader)
@@ -81,7 +75,7 @@ func getShaderInfoLog(program uint32) string {
 	return log
 }
 
-func LoadMatrix(m *geom.Mat4, program uint32, name string) {
+func loadMatrix(m *geom.Mat4, program uint32, name string) {
 	loc := gl.GetUniformLocation(program, gl.Str(name+"\x00"))
 	gl.UniformMatrix4fv(loc, 1, false, (*float32)(unsafe.Pointer(m.Floats())))
 }

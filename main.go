@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"runtime"
@@ -8,7 +9,7 @@ import (
 
 	"github.com/fzipp/geom"
 	"github.com/go-gl/gl/v4.1-core/gl"
-	"github.com/go-gl/glfw/v3.2/glfw"
+	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
 const (
@@ -16,77 +17,29 @@ const (
 	resH = 600
 )
 
-func init() {
-	// GLFW event handling must run on the main OS thread
-	runtime.LockOSThread()
-}
-
-func InitGraphics() (*glfw.Window, error) {
-	if err := glfw.Init(); err != nil {
-		return nil, err
-	}
-
-	glfw.WindowHint(glfw.ContextVersionMajor, 3)
-	glfw.WindowHint(glfw.ContextVersionMinor, 2)
-	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
-	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
-
-	win, err := glfw.CreateWindow(resW, resH, "OpenGL Demo", nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	win.MakeContextCurrent()
-
-	// Initialize Glow
-	if err := gl.Init(); err != nil {
-		return nil, err
-	}
-
-	return win, nil
-}
-
-func ck(err error) {
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-}
-
-const (
-	quadVertexCount = 4
-	dimensions      = 2
-)
-
 type Rect struct {
 	geom.Vec2
 	geom.Size
 }
 
-type quadArray [quadVertexCount * dimensions]float32
-
-func quadCoords(r Rect, coords *quadArray) {
-	coords[0] = r.X
-	coords[1] = r.Y
-	coords[2] = r.X + r.W
-	coords[3] = r.Y
-	coords[4] = r.X
-	coords[5] = r.Y + r.H
-	coords[6] = coords[2]
-	coords[7] = coords[5]
-}
+var (
+	//go:embed shader/vertex.glsl
+	vertexShader string
+	//go:embed shader/fragment.glsl
+	fragmentShader string
+)
 
 func main() {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	win, err := InitGraphics()
+	win, err := initGraphics(resW, resH)
 	defer glfw.Terminate()
 
-	ck(err)
+	check(err)
 
-	vs, fs, err := LoadShaders("shaders/vertex.glsl", "shaders/fragment.glsl")
-	ck(err)
+	vertexShader, fragmentShader, err := loadShaders(vertexShader, fragmentShader)
+	check(err)
 
 	gl.ClearColor(0.0, 0.0, 0.4, 0.0)
 
@@ -102,18 +55,18 @@ func main() {
 	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, unsafe.Pointer(&vertices), gl.STATIC_DRAW)
 
-	prog, err := LoadProgram(vs, fs)
-	ck(err)
-	gl.UseProgram(prog)
+	program, err := loadProgram(vertexShader, fragmentShader)
+	check(err)
+	gl.UseProgram(program)
 
 	// Init and load PMV matrices
 	var pmatrix, mvmatrix geom.Mat4
 	pmatrix.Ortho(0, resW, resH, 0, -1.0, 1.0)
-	LoadMatrix(&pmatrix, prog, "pmatrix")
+	loadMatrix(&pmatrix, program, "pmatrix")
 	mvmatrix.ID()
-	LoadMatrix(&mvmatrix, prog, "mvmatrix")
+	loadMatrix(&mvmatrix, program, "mvmatrix")
 
-	attr := uint32(gl.GetAttribLocation(prog, gl.Str("vertex\x00")))
+	attr := uint32(gl.GetAttribLocation(program, gl.Str("vertex\x00")))
 
 	for !win.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT)
@@ -126,5 +79,54 @@ func main() {
 
 		win.SwapBuffers()
 		glfw.PollEvents()
+	}
+}
+
+func initGraphics(width, height int) (*glfw.Window, error) {
+	if err := glfw.Init(); err != nil {
+		return nil, fmt.Errorf("could not initialize GLFW: %w", err)
+	}
+
+	glfw.WindowHint(glfw.ContextVersionMajor, 3)
+	glfw.WindowHint(glfw.ContextVersionMinor, 3)
+	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
+	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
+
+	win, err := glfw.CreateWindow(width, height, "OpenGL Demo", nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not create windoe: %w", err)
+	}
+
+	win.MakeContextCurrent()
+
+	if err := gl.Init(); err != nil {
+		return nil, fmt.Errorf("could not initialize OpenGL bindings: %w", err)
+	}
+
+	return win, nil
+}
+
+const (
+	quadVertexCount = 4
+	dimensions      = 2
+)
+
+type quadArray [quadVertexCount * dimensions]float32
+
+func quadCoords(r Rect, coords *quadArray) {
+	coords[0] = r.X
+	coords[1] = r.Y
+	coords[2] = r.X + r.W
+	coords[3] = r.Y
+	coords[4] = r.X
+	coords[5] = r.Y + r.H
+	coords[6] = coords[2]
+	coords[7] = coords[5]
+}
+
+func check(err error) {
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 }
