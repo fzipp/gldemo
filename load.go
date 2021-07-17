@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-	"unsafe"
 
 	"github.com/fzipp/geom"
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -77,5 +76,5 @@ func getShaderInfoLog(program uint32) string {
 
 func loadMatrix(m *geom.Mat4, program uint32, name string) {
 	loc := gl.GetUniformLocation(program, gl.Str(name+"\x00"))
-	gl.UniformMatrix4fv(loc, 1, false, (*float32)(unsafe.Pointer(m.Floats())))
+	gl.UniformMatrix4fv(loc, 1, false, &m[0][0])
 }
