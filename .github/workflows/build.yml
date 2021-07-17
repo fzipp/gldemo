@@ -6,6 +6,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Install glfw
+        run: sudo apt-get install libglfw3-dev
       - uses: actions/checkout@v2
       - name: Setup Go
         uses: actions/setup-go@v2
