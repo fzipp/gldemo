@@ -1,6 +1,6 @@
 module github.com/fzipp/gldemo
 
-go 1.16
+go 1.18
 
 require (
 	github.com/fzipp/geom v1.0.0
